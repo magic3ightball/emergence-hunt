@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emergence Hunt</title>
+<style>
+  :root { --bg:#0b0d12; --panel:#12151d; --line:#232837; --ink:#e8e6df; --dim:#8a90a0; --acc:#e2b85c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 ui-sans-serif, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  header { display:flex; gap:14px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; letter-spacing:.04em; font-weight:650; }
+  nav button { background:none; border:1px solid var(--line); color:var(--dim); padding:5px 12px; border-radius:16px; cursor:pointer; }
+  nav button.on { color:var(--bg); background:var(--acc); border-color:var(--acc); }
+  #status { color:var(--dim); margin-left:auto; font-variant-numeric:tabular-nums; }
+  main > section { display:none; padding:14px 16px; gap:14px; }
+  main > section.on { display:grid; }
+  #gs, #pl { grid-template-columns: minmax(0, 1fr) 360px; }
+  @media (max-width: 980px) { #gs, #pl { grid-template-columns: 1fr; } }
+  .stage { align-self:start; position:relative; background:#000; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .stage canvas { display:block; width:100%; height:auto; image-rendering:pixelated; }
+  .overlay { position:absolute; inset:0; pointer-events:none; }
+  .overlay .tag { position:absolute; font-size:10px; padding:1px 4px; border-radius:3px; background:rgba(0,0,0,.6); white-space:nowrap; }
+  .overlay .cell { position:absolute; pointer-events:auto; cursor:pointer; }
+  .overlay .cell:hover { outline:1px solid var(--acc); }
+  .overlay .pt { position:absolute; width:9px; height:9px; margin:-5px; border-radius:50%; border:2px solid #fff; background:rgba(0,0,0,.5); }
+  .overlay .pl { position:absolute; font-size:11px; color:#fff; text-shadow:0 0 3px #000, 0 0 3px #000; transform:translate(6px,-14px); font-weight:600; }
+  .side { display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .card h3 { margin:0 0 6px; font-size:12px; color:var(--dim); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  button.b { background:#1b2030; color:var(--ink); border:1px solid #2d3448; padding:6px 10px; border-radius:6px; cursor:pointer; font:inherit; }
+  button.b:hover { border-color:var(--acc); }
+  button.b.run { background:var(--acc); color:#111; border-color:var(--acc); }
+  select, input { background:#1b2030; color:var(--ink); border:1px solid #2d3448; border-radius:6px; padding:4px 6px; font:inherit; }
+  table { border-collapse:collapse; width:100%; font-size:11.5px; }
+  td, th { padding:2px 4px; border-bottom:1px solid var(--line); text-align:left; }
+  .ok { color:#73db85; } .bad { color:#e8705d; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; margin-right:8px; font-size:11px; }
+  .legend i { width:9px; height:9px; border-radius:2px; display:inline-block; }
+  #gsScatter { width:100%; height:auto; background:#07080c; border-radius:6px; }
+  .small { color:var(--dim); font-size:11.5px; }
+  #gal { grid-template-columns: 1fr; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+  .find { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; cursor:pointer; position:relative; }
+  .find:hover { border-color:var(--acc); }
+  .find img { width:100%; display:block; aspect-ratio:1; image-rendering:pixelated; }
+  .find .m { padding:6px 8px; font-size:11px; }
+  .find .lab { font-weight:650; }
+  .find .x { position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); border:0; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; }
+  .find.known { border-style:dashed; }
+  .viewer canvas { width:100%; display:block; border-radius:6px; background:#000; }
+  a { color:var(--acc); }
+  .bar { height:4px; background:#1b2030; border-radius:2px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--acc); width:0; }
+  #algo { grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); align-items:start; max-width:1280px; }
+  #algo .card { font-size:13px; line-height:1.6; }
+  #algo .card.wide { grid-column: 1 / -1; }
+  #algo h2 { font-size:14px; margin:0 0 8px; color:var(--acc); font-weight:650; }
+  #algo p { margin:6px 0; }
+  #algo svg { width:100%; max-width:520px; height:auto; display:block; margin:8px 0; }
+  #algo svg.w { max-width:none; min-width:620px; }
+  #algo .card.wide { overflow-x:auto; }
+  #algo svg.w text { font-size:13.5px; }
+  #algo svg text { font:11px ui-sans-serif, -apple-system, "Apple SD Gothic Neo", sans-serif; fill:var(--ink); }
+  #algo svg .d { fill:var(--dim); }
+  #algo .eq { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b0d12; border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; white-space:pre; }
+  #algo .note { border-left:2px solid var(--acc); padding:2px 0 2px 10px; color:var(--dim); font-size:12px; margin:8px 0; }
+  #algo td:first-child { white-space:nowrap; font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Emergence Hunt</h1>
+  <nav>
+    <button data-tab="gs" class="on">Gray-Scott</button>
+    <button data-tab="pl">Particle Life</button>
+    <button data-tab="gal">Gallery <span id="galCount"></span></button>
+    <button data-tab="algo">작동 원리</button>
+  </nav>
+  <div id="status">WebGPU 준비 중…</div>
+</header>
+<main>
+  <section id="gs" class="on">
+    <div class="stage" id="gsStage"><canvas id="gsCanvas"></canvas><div class="overlay" id="gsOverlay"></div></div>
+    <div class="side">
+      <div class="card">
+        <h3>Gray-Scott</h3>
+        <div class="row">
+          <button class="b" id="gsMapBtn">알려진 지도 (F,k 맵)</button>
+          <button class="b" id="gsBenchBtn">Pearson 재현 테스트</button>
+          <button class="b run" id="gsScanBtn">자동 스캔 시작</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <label class="small">스텝 <select id="gsSteps"><option>6000</option><option selected>10000</option><option>16000</option></select></label>
+          <label class="small"><input type="checkbox" id="gsOddIC" checked> 특이 초기조건</label>
+        </div>
+        <div class="bar" style="margin-top:8px"><i id="gsProg"></i></div>
+        <div class="small" id="gsInfo" style="margin-top:6px"></div>
+      </div>
+      <div class="card">
+        <h3>분류 지도 (스캔 결과)</h3>
+        <canvas id="gsScatter" width="680" height="560"></canvas>
+        <div class="legend" id="gsLegend"></div>
+        <div class="small" id="gsScanStats"></div>
+      </div>
+      <div class="card" id="gsBenchCard" style="display:none"><h3>Pearson 재현</h3><div id="gsBench"></div></div>
+      <div class="card viewer"><h3>재생</h3><canvas id="gsView"></canvas><div class="small" id="gsViewInfo">갤러리나 타일을 누르면 여기서 다시 돌려봅니다.</div></div>
+    </div>
+  </section>
+  <section id="pl">
+    <div class="stage"><canvas id="plCanvas" width="1024" height="1024"></canvas><div class="overlay" id="plOverlay"></div></div>
+    <div class="side">
+      <div class="card">
+        <h3>Particle Life</h3>
+        <div class="row"><button class="b run" id="plRunBtn">랜덤 탐색 시작</button>
+          <label class="small"><input type="checkbox" id="plMutate" checked> 갤러리에서 변이</label></div>
+        <div class="bar" style="margin-top:8px"><i id="plProg"></i></div>
+        <div class="small" id="plInfo" style="margin-top:6px">16개 우주 × 1024 입자. 각 판마다 무작위 인력 행렬로 돌리고 구조를 점수화합니다.</div>
+      </div>
+      <div class="card"><h3>최근 판 점수</h3><div id="plTable" class="small"></div></div>
+      <div class="card viewer"><h3>재생</h3><canvas id="plView" width="720" height="720"></canvas><div class="small" id="plViewInfo"></div></div>
+    </div>
+  </section>
+  <section id="gal">
+    <div class="card">
+      <div class="row">
+        <select id="galMode"><option value="all">전부</option><option value="gs">Gray-Scott</option><option value="pl">Particle Life</option></select>
+        <select id="galSort"><option value="novelty">새로움 순</option><option value="time">최근 순</option><option value="score">점수 순</option></select>
+        <label class="small"><input type="checkbox" id="galKnown"> 알려진 기준(Pearson) 보기</label>
+        <button class="b" id="galExport">JSON 내보내기</button>
+        <button class="b" id="galClear">발견 비우기</button>
+        <span class="small">새로움 = 같은 모드의 저장된 항목(+알려진 기준) 중 가장 가까운 3개까지의 평균 특징 거리</span>
+      </div>
+    </div>
+    <div class="grid" id="galGrid"></div>
+    <div class="card small" id="sources"></div>
+  </section>
+  <section id="algo">
+    <div class="card wide">
+      <h2>한눈에 보기</h2>
+      <p>규칙 하나를 무작위로 고르고, GPU에서 수천 스텝을 돌립니다. 결과를 숫자 몇 개(특징 벡터)로 요약하고, 이미 아는 패턴과 얼마나 다른지 잽니다. 충분히 다르면 갤러리에 남깁니다. 이 과정을 한 판에 수십 개씩, 계속 반복합니다.</p>
+      <svg class="w" viewBox="0 0 900 120" role="img" aria-label="탐색 흐름: 규칙 뽑기, 시뮬레이션, 특징 요약, 분류, 새로움 비교, 갤러리">
+        <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8a90a0"/></marker></defs>
+        <g stroke="#2d3448" fill="#1b2030">
+          <rect x="4" y="22" width="132" height="58" rx="8"/><rect x="156" y="22" width="132" height="58" rx="8"/>
+          <rect x="308" y="22" width="132" height="58" rx="8"/><rect x="460" y="22" width="132" height="58" rx="8"/>
+          <rect x="612" y="22" width="132" height="58" rx="8"/><rect x="764" y="22" width="132" height="58" rx="8" stroke="#e2b85c"/>
+        </g>
+        <g stroke="#8a90a0" stroke-width="1.5" marker-end="url(#ar)">
+          <line x1="136" y1="51" x2="154" y2="51"/><line x1="288" y1="51" x2="306" y2="51"/><line x1="440" y1="51" x2="458" y2="51"/>
+          <line x1="592" y1="51" x2="610" y2="51"/><line x1="744" y1="51" x2="762" y2="51"/>
+        </g>
+        <path d="M830 80 C830 112, 70 112, 70 82" fill="none" stroke="#8a90a0" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+        <g text-anchor="middle">
+          <text x="70" y="46">① 규칙 뽑기</text><text x="70" y="64" class="d">(F,k) 또는 인력 행렬</text>
+          <text x="222" y="46">② GPU 시뮬레이션</text><text x="222" y="64" class="d">여러 판을 동시에</text>
+          <text x="374" y="46">③ 특징 요약</text><text x="374" y="64" class="d">13개 / 10개 숫자</text>
+          <text x="526" y="46">④ 분류</text><text x="526" y="64" class="d">점·줄무늬·혼돈…</text>
+          <text x="678" y="46">⑤ 새로움 측정</text><text x="678" y="64" class="d">가까운 3개와의 거리</text>
+          <text x="830" y="46">⑥ 갤러리</text><text x="830" y="64" class="d">모드별 40개</text>
+          <text x="450" y="114" class="d">갤러리에 남은 발견 주변을 다시 뽑아 더 파고듭니다 (적응형 정밀 스캔 · 변이)</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h2>Gray-Scott 반응-확산</h2>
+      <p>두 화학물질 u, v가 격자 위에서 퍼지면서 반응합니다. v는 u를 먹고 자기를 늘립니다(u + 2v → 3v). 바깥에서 u를 속도 <b>F</b>로 채워 넣고, v는 속도 <b>F+k</b>로 빠져나갑니다. 고를 수 있는 값은 이 두 숫자뿐인데, 값에 따라 점·줄무늬·스스로 복제하는 점·혼돈이 나옵니다.</p>
+      <div class="eq">u ← u + Du·∇²u − u·v² + F·(1 − u)
+v ← v + Dv·∇²v + u·v² − (F + k)·v</div>
+      <svg viewBox="0 0 440 150" role="img" aria-label="라플라시안 5점 스텐실: 이웃 4칸 합에서 가운데 4배를 뺌">
+        <g stroke="#2d3448" fill="#12151d">
+          <rect x="60" y="10" width="40" height="40"/><rect x="20" y="50" width="40" height="40"/><rect x="60" y="50" width="40" height="40" fill="#2a2414" stroke="#e2b85c"/>
+          <rect x="100" y="50" width="40" height="40"/><rect x="60" y="90" width="40" height="40"/>
+        </g>
+        <g text-anchor="middle"><text x="80" y="35">+1</text><text x="40" y="75">+1</text><text x="80" y="75">−4</text><text x="120" y="75">+1</text><text x="80" y="115">+1</text></g>
+        <text x="170" y="40">∇² (라플라시안) = 이웃 4칸 합 − 가운데×4</text>
+        <text x="170" y="62" class="d">주변보다 낮으면 채워지고 높으면 퍼져 나감 = 확산</text>
+        <text x="170" y="92">상수는 Pearson(1993)과 같게:</text>
+        <text x="170" y="112" class="d">Du = 0.2097, Dv = 0.1049, dx = 1, dt = 1</text>
+        <text x="170" y="132" class="d">각 타일은 가장자리가 반대편과 이어진 원환(torus)</text>
+      </svg>
+      <div class="note">GPU 컴퓨트 셰이더가 셀마다 위 식을 동시에 계산합니다. 128×128 타일 수십 장을 한 버퍼에 붙여 놓고, 타일마다 다른 (F,k)로 한꺼번에 돌립니다.</div>
+    </div>
+
+    <div class="card">
+      <h2>어디를 뒤지나: F,k 스캔</h2>
+      <svg viewBox="0 0 440 210" role="img" aria-label="F-k 평면에서 초승달 모양 띠를 따라 샘플링">
+        <rect x="40" y="10" width="380" height="160" fill="#07080c" stroke="#2d3448"/>
+        <path d="M40 168 C120 150, 190 110, 250 70 C300 38, 360 22, 410 16 L420 34 C370 40, 310 58, 262 90 C205 128, 135 165, 70 170 Z" fill="#e2b85c" opacity=".16"/>
+        <path d="M40 170 C120 152, 195 115, 256 80 C305 50, 362 30, 416 24" fill="none" stroke="#e2b85c" stroke-dasharray="5 4"/>
+        <g fill="#4fb3bf"><circle cx="120" cy="150" r="3"/><circle cx="160" cy="136" r="3"/><circle cx="205" cy="112" r="3"/><circle cx="240" cy="86" r="3"/><circle cx="282" cy="66" r="3"/><circle cx="330" cy="44" r="3"/><circle cx="372" cy="32" r="3"/><circle cx="190" cy="126" r="3"/><circle cx="300" cy="62" r="3"/></g>
+        <g fill="#e2725b"><circle cx="262" cy="80" r="3"/><circle cx="268" cy="76" r="2.5"/><circle cx="258" cy="74" r="2.5"/><circle cx="270" cy="84" r="2.5"/></g>
+        <text x="230" y="196" text-anchor="middle" class="d">k (죽는 속도) →</text>
+        <text x="16" y="95" class="d" transform="rotate(-90 16 95)" text-anchor="middle">F (먹이) →</text>
+        <text x="280" y="140">점선: k = √F/2 − F 근처</text>
+        <text x="280" y="156" class="d">패턴이 생기는 경계</text>
+        <text x="150" y="40">● 고르게 흩뿌린 샘플(R2 수열)</text>
+        <text x="150" y="58" style="fill:#e2725b">● 흥미로운 곳 주변 정밀 샘플</text>
+      </svg>
+      <p>패턴은 F,k 평면 전체가 아니라 초승달 모양의 좁은 띠에서만 생깁니다. 그래서 그 띠 안에서만 고르게 샘플을 뽑습니다. 절반은 이전에 균일하지 않은 결과가 나온 곳 주변을 더 촘촘히 다시 뽑습니다(적응형 정밀 스캔).</p>
+      <p>"특이 초기조건"을 켜면 Pearson의 사각형 씨앗 외에도 고리·호·줄·체커·그라디언트 등 10가지 씨앗을 섞어 씁니다. 같은 (F,k)라도 씨앗에 따라 다른 패턴이 살아남기 때문입니다.</p>
+    </div>
+
+    <div class="card">
+      <h2>Gray-Scott 자동 분류</h2>
+      <p>마지막 v 농도장을 중간값으로 잘라 덩어리(연결 성분)를 셉니다. 덩어리마다 넓이, 둘레, <b>원형도</b>(4π·넓이/둘레², 원이면 1)를 잽니다. 마지막 두 스냅샷을 비교해 얼마나 변하는지(활동량), 덩어리가 움직이는지, 개수가 늘었는지도 봅니다. 아래 표의 위에서부터 차례로 검사합니다.</p>
+      <table>
+        <tr><td style="color:#5b6170">uniform</td><td>농도 차가 거의 없음(범위 &lt; 0.04)</td></tr>
+        <tr><td style="color:#b48ce6">moving solitons</td><td>덩어리가 개수도 크기도 그대로인 채 움직이고 바탕은 조용함(변하는 칸 &lt; 20%). 둥근 점이 빨리 움직이거나, 어떤 모양이든 마지막 두 구간(4,000스텝씩) 동안 같은 속도로 천천히 미끄러지면 해당. U-skate는 200스텝에 0.3칸쯤으로 아주 느림</td></tr>
+        <tr><td style="color:#7fa8e8">expanding</td><td>덩어리 4개 이하가 체크포인트마다 계속 커짐(거품). 줄처럼 길게 자라는 벌레는 stripes로 둠</td></tr>
+        <tr><td style="color:#e2725b">self-replicating</td><td>점이 나뉘며 늘어남: 개수가 크게 늘었거나(log 비 &gt; 1.6) 체크포인트마다 줄지 않고 2배 이상 늘어남. 변하는 칸은 35% 미만</td></tr>
+        <tr><td style="color:#e85d9a">chaos</td><td>바탕 전체가 계속 출렁임. 판 전체에서 점이 쉬지 않고 나뉘고 죽는 경우도 여기</td></tr>
+        <tr><td style="color:#4fb3bf">spots</td><td>둥근 점(원형도 &gt; 0.55), 긴 줄은 적음</td></tr>
+        <tr><td style="color:#e2b85c">stripes</td><td>그 밖의 길쭉한 모양</td></tr>
+      </table>
+      <div class="note">검증: Pearson·Munafo가 정리한 알려진 영역 19개를 256×256, 10,000스텝으로 돌리면 19개 모두 기대한 분류로 나옵니다. 단, σ와 ρ는 "거품이 아직 커지는 중"이어서 expanding도 정답으로 인정했습니다. 2026-10-20에 스캔 1,200칸을 눈으로 보고 규칙을 고쳤고, 그 결과 17칸의 분류가 바뀌었습니다. "Pearson 재현 테스트" 버튼으로 다시 돌려볼 수 있습니다.</div>
+    </div>
+
+    <div class="card">
+      <h2>Particle Life</h2>
+      <p>점 1024개가 3~8가지 색(종)으로 나뉘어 있습니다. 종마다 다른 종을 얼마나 끌어당기거나 밀어내는지 정한 <b>인력 행렬</b>이 있는데, 이 행렬 하나가 "규칙"입니다. 행렬이 대칭이 아니라서(A는 B를 좋아하는데 B는 A를 싫어함) 쫓고 쫓기는 움직임이 생깁니다.</p>
+      <svg viewBox="0 0 440 190" role="img" aria-label="거리에 따른 힘 곡선: 가까우면 반발, 중간 거리에서 행렬 값만큼 인력 또는 척력">
+        <line x1="30" y1="90" x2="420" y2="90" stroke="#2d3448"/><line x1="30" y1="20" x2="30" y2="170" stroke="#2d3448"/>
+        <line x1="137" y1="20" x2="137" y2="170" stroke="#2d3448" stroke-dasharray="3 3"/>
+        <polyline points="30,160 137,90 261,34 386,90 420,90" fill="none" stroke="#73db85" stroke-width="2"/>
+        <polyline points="137,90 261,130 386,90" fill="none" stroke="#e8705d" stroke-width="2" stroke-dasharray="5 4"/>
+        <text x="36" y="182" class="d">0</text><text x="128" y="182" class="d">β = 0.3</text><text x="372" y="182" class="d">rmax</text>
+        <text x="146" y="158">← 아주 가까우면 모두 밀어냄</text><text x="146" y="172" class="d">(겹치지 않게)</text>
+        <text x="268" y="34" style="fill:#73db85">행렬 값 a &gt; 0 → 끌림</text>
+        <text x="268" y="140" style="fill:#e8705d">a &lt; 0 → 밀어냄</text>
+        <text x="300" y="80" class="d">거리 →</text><text x="36" y="32" class="d">힘</text>
+      </svg>
+      <p>16개 우주를 한 번에 돌리고(우주마다 다른 행렬), 마찰 때문에 속도가 반감기 0.04마다 반으로 줄어듭니다. 랜덤 탐색에 더해 "갤러리에서 변이"를 켜면 이미 저장된 좋은 행렬을 조금씩 흔들어 새 후보를 만듭니다.</p>
+    </div>
+
+    <div class="card">
+      <h2>Particle Life 점수와 분류</h2>
+      <p>점 사이 거리가 0.025 안이면 이어서 덩어리를 만들고, 12개 이상 모인 덩어리만 셉니다. 일정 시간 떨어진 두 스냅샷을 비교해 덩어리 중심이 얼마나 옮겨갔는지(이동), 중심 주위로 얼마나 돌았는지(회전)를 잽니다. 바깥 껍질이 한 종으로 얇게 둘러싸였는지(막)도 봅니다.</p>
+      <table>
+        <tr><td style="color:#5b6170">gas</td><td>덩어리가 거의 없이 흩어짐</td></tr>
+        <tr><td style="color:#73db85">membranes</td><td>한 종이 바깥에 얇은 껍질을 만든 "세포"</td></tr>
+        <tr><td style="color:#e85d9a">rotators</td><td>덩어리가 제자리에서 회전</td></tr>
+        <tr><td style="color:#b48ce6">movers</td><td>덩어리가 한 방향으로 헤엄쳐 감</td></tr>
+        <tr><td style="color:#e2b85c">clusters</td><td>멈춘 덩어리 4개 이상</td></tr>
+        <tr><td style="color:#4fb3bf">blobs</td><td>멈춘 덩어리 1~3개</td></tr>
+      </table>
+      <div class="note">점수는 구조가 있을 때만 올라가고, 움직임·회전·막이 있으면 더 붙습니다. 한 덩어리로 다 뭉친 경우(85% 이상)는 깎습니다.</div>
+    </div>
+
+    <div class="card wide">
+      <h2>"새롭다"는 어떻게 판단하나</h2>
+      <p>Game of Life에는 전 세계 사람들이 찾은 패턴을 모은 목록(Catagolue)이 있지만, Gray-Scott과 Particle Life에는 그런 목록이 없습니다. 그래서 결과를 숫자 벡터로 바꾸고, <b>이미 아는 것들과의 거리</b>로 새로움을 정합니다.</p>
+      <svg class="w" viewBox="0 0 900 200" role="img" aria-label="특징 공간에서 후보와 가장 가까운 세 점까지의 거리 평균">
+        <rect x="10" y="10" width="420" height="180" rx="8" fill="#07080c" stroke="#2d3448"/>
+        <g fill="none" stroke="#8a90a0" stroke-dasharray="4 3"><circle cx="70" cy="60" r="6"/><circle cx="110" cy="150" r="6"/><circle cx="380" cy="160" r="6"/></g>
+        <g fill="#4fb3bf"><circle cx="150" cy="70" r="5"/><circle cx="180" cy="120" r="5"/><circle cx="330" cy="50" r="5"/><circle cx="360" cy="110" r="5"/><circle cx="60" cy="110" r="5"/></g>
+        <g stroke="#e2b85c" stroke-width="1.5"><line x1="250" y1="95" x2="180" y2="120"/><line x1="250" y1="95" x2="150" y2="70"/><line x1="250" y1="95" x2="330" y2="50"/></g>
+        <circle cx="250" cy="95" r="7" fill="#e2b85c"/>
+        <text x="262" y="100" style="fill:#e2b85c">새 후보</text>
+        <text x="30" y="30" class="d">○ 알려진 기준(Pearson)   ● 저장된 발견</text>
+        <g>
+          <text x="460" y="40">새로움 = 같은 모드에서 가장 가까운 3개까지 거리의 평균</text>
+          <text x="460" y="62" class="d">비교 대상: 알려진 Pearson 기준 + 지금까지 저장한 발견</text>
+          <text x="460" y="92">기준을 넘으면 저장 (Gray-Scott 0.18, Particle Life 0.15)</text>
+          <text x="460" y="114" class="d">알려진 패턴에 너무 가까우면 "새롭지 않음"으로 버림</text>
+          <text x="460" y="144">모드별로 가장 새로운 40개만 유지</text>
+          <text x="460" y="166" class="d">한 분류가 30%를 넘지 못하게 막음 — 혼돈은 잡음 때문에</text>
+          <text x="460" y="182" class="d">늘 새로워 보여서, 막지 않으면 갤러리를 다 차지함</text>
+        </g>
+      </svg>
+      <div class="note">특징 벡터 — Gray-Scott 13개: 농도 분산, 높은 쪽 비율, 덩어리 수, 평균 크기, 원형도, 줄 비율, 활동량, 이동, 증가, 교체율, 점/구멍 여부, 후반 증가, 변하는 칸 비율. Particle Life 10개: 뭉친 비율, 덩어리 수, 최대 덩어리, 속도, 이동, 회전, 막, 종 순도, 크기 편차, 평균 크기. 모두 0~1로 맞춥니다.</div>
+      <p class="small">한계: "새롭다"는 이 특징들로 본 거리일 뿐이라 사람 눈으로 보는 새로움과 다를 수 있습니다. 발견은 이 브라우저(IndexedDB)에만 저장되고, 썸네일을 누르면 같은 규칙과 시드로 다시 돌려볼 수 있습니다. 출처는 갤러리 탭 아래쪽에 있습니다.</p>
+    </div>
+  </section>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
